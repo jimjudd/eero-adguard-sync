@@ -90,6 +90,13 @@ docker compose logs -f eag-sync
 
 The included [`docker-compose.yml`](/Users/jimjudd/Documents/python/eero-adguard-sync/docker-compose.yml) mounts `./data` into the container so the cached Eero session survives container restarts and image updates.
 
+Container startup behavior:
+
+- the container runs one sync immediately on startup
+- if that first sync succeeds, cron is started for the regular schedule
+- if that first sync fails, the container exits so the failure is visible in logs
+- each sync run logs clear start and finish messages in addition to the CLI output from Eero and AdGuard authentication
+
 If you want to build locally on a machine with a working Docker engine, use the override file:
 
 ```sh
