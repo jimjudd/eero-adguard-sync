@@ -43,6 +43,7 @@ These options are supported by the CLI and the included Compose setup:
 | `EAG_DATA_DIR` | No | Directory where the cached Eero session is stored |
 | `EAG_CRON_SCHEDULE` | No | Cron schedule used by the container, default `0 * * * *` |
 | `EAG_IMAGE` | No | Container image to run, default `ghcr.io/jimjudd/eero-adguard-sync:latest` |
+| `EAG_DATA_VOLUME` | No | Host path to mount at `/data`, default `./data` |
 | `EAG_DELETE` | No | Set to `true` to delete AdGuard clients missing from Eero |
 | `EAG_OVERWRITE` | No | Set to `true` to clear AdGuard clients before sync |
 | `TZ` | No | Container timezone |

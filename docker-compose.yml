@@ -17,4 +17,4 @@ services:
       EAG_DELETE: ${EAG_DELETE:-false}
       EAG_OVERWRITE: ${EAG_OVERWRITE:-false}
     volumes:
-      - ./data:/data
+      - ${EAG_DATA_VOLUME:-./data}:/data
