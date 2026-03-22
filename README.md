@@ -1,123 +1,139 @@
-# Eero-AdGuard-Sync
-Sync Eero DHCP client list to AdGuard Home
+# Eero AdGuard Sync
 
-[![Release](https://github.com/amickael/eero-adguard-sync/actions/workflows/python-publish.yml/badge.svg)](https://github.com/amickael/eero-adguard-sync/actions/workflows/python-publish.yml)
-[![PyPI](https://img.shields.io/pypi/v/eero-adguard-sync?color=blue)](https://pypi.org/project/eero-adguard-sync/)
-[![Code style](https://img.shields.io/badge/code%20style-black-black)](https://github.com/psf/black)
+Sync hostnames and identifiers from your Eero client list into AdGuard Home.
 
+This fork is aimed at self-hosted use with Docker Compose. The original project flow depended on an old published package and a manually copied Eero cookie; this repo now supports:
 
-![eero-adguard-sync](https://repository-images.githubusercontent.com/445873210/a0dcb692-fe53-4e6e-83a9-4507664080c1)
+- building the image from this fork
+- persisting the Eero session in a mounted data directory
+- unattended scheduled syncs with Docker Compose
+- explicit Eero network selection for multi-network accounts
 
-Table of Contents
-=================
-* [Eero-Adguard-Sync](#eero-adguard-sync)
-   * [Dependencies](#-dependencies)
-   * [Installation](#️-installation)
-   * [Usage](#-usage)
-   * [Options](#️-options)
-      * [eag-sync](#eag-sync)
-      * [eag-sync sync](#eag-sync-sync)
-      * [eag-sync clear](#eag-sync-clear)
-   * [Autocompletion](#-autocompletion)
-      * [bash](#bash)
-      * [zsh](#zsh)
-   * [Docker](#-docker)
-   * [License](#️-license)
+## How It Works
 
-## 👶 Dependencies
-* [Python 3.7 or higher](https://www.python.org/downloads/)
+`eag-sync` reads the devices known to your Eero account, converts them into AdGuard Home client entries, then:
 
-## 🛠️ Installation
-Install from PyPI using `pip`, you may need to use `pip3` depending on your installation:
-```shell
-pip install eero-adguard-sync
+- updates matching AdGuard clients by MAC address
+- creates missing clients
+- optionally deletes AdGuard clients that are no longer present in Eero
+
+The sync is one-way: Eero is the source of truth.
+
+## Important Caveat
+
+Eero login still uses a verification-code flow. For unattended operation, you should do one interactive login first so the session cookie is cached in the mounted `/data` directory. After that, scheduled runs reuse the cached session until Eero invalidates it.
+
+If Eero expires the session later, you can re-run one interactive login to refresh it.
+
+## Environment Variables
+
+These options are supported by the CLI and the included Compose setup:
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `EAG_ADGUARD_HOST` | Yes | AdGuard Home base URL, for example `http://adguard-home:3000` |
+| `EAG_ADGUARD_USER` | Yes | AdGuard Home admin username |
+| `EAG_ADGUARD_PASSWORD` | Yes | AdGuard Home admin password |
+| `EAG_EERO_USER` | First login | Eero email address or phone number |
+| `EAG_EERO_NETWORK_ID` | No | Specific Eero network URL/ID to sync |
+| `EAG_EERO_NETWORK_NAME` | No | Specific Eero network name to sync |
+| `EAG_EERO_COOKIE` | No | Optional pre-captured Eero session cookie |
+| `EAG_DATA_DIR` | No | Directory where the cached Eero session is stored |
+| `EAG_CRON_SCHEDULE` | No | Cron schedule used by the container, default `0 * * * *` |
+| `EAG_DELETE` | No | Set to `true` to delete AdGuard clients missing from Eero |
+| `EAG_OVERWRITE` | No | Set to `true` to clear AdGuard clients before sync |
+| `TZ` | No | Container timezone |
+
+If your Eero account has more than one network, set exactly one of `EAG_EERO_NETWORK_ID` or `EAG_EERO_NETWORK_NAME` for non-interactive runs.
+
+## Docker Compose
+
+1. Copy the example env file:
+
+```sh
+cp .env.example .env
 ```
 
-## 🚀 Usage
-**eag-sync** is a command-line program to sync your Eero DHCP client list to AdGuard Home, note that it is a one-way sync from Eero to AdGuard. It requires Python interpreter version 3.7+.
+2. Edit `.env` with your AdGuard Home settings and Eero username.
 
-To run a sync process run the `eag-sync sync` command, you can find a full list of options below. Sample usage:
-```shell
-eag-sync sync
+3. If you have multiple Eero networks, set either `EAG_EERO_NETWORK_ID` or `EAG_EERO_NETWORK_NAME`.
+
+4. Build the image:
+
+```sh
+docker compose build
 ```
 
-You may be prompted for an Eero email or SMS code the first time you run this program. Your credentials never leave your computer, all processing is done client side.
+5. Run an interactive first sync to complete Eero verification and cache the session in `./data`:
 
-To clear all locally cached credentials run the `clear` command:
-```shell
-eag-sync clear
+```sh
+docker compose run --rm eag-sync eag-sync sync
 ```
 
+6. Once that succeeds, start the scheduled container:
 
-## ⚙️ Options
-### `eag-sync`
-```
-Usage: eag-sync [OPTIONS] COMMAND [ARGS]...
-
-Options:
-  --version  Show the version and exit.
-  --help     Show this message and exit.
-
-Commands:
-  sync
-  clear
+```sh
+docker compose up -d
 ```
 
-### `eag-sync sync`
-```
-Usage: eag-sync sync [OPTIONS]
+7. Watch logs:
 
-Options:
-  --adguard-host TEXT      AdGuard Home host IP address
-  --adguard-user TEXT      AdGuard Home username
-  --adguard-password TEXT  AdGuard Home password
-  --eero-user TEXT         Eero email address or phone number
-  -d, --delete             Delete AdGuard clients not found in Eero DHCP list
-  -y, --confirm            Skip interactive confirmation
-  -o, --overwrite          Delete all AdGuard clients before sync
-  --help                   Show this message and exit.
+```sh
+docker compose logs -f eag-sync
 ```
 
-### `eag-sync clear`
+The included [`docker-compose.yml`](/Users/jimjudd/Documents/python/eero-adguard-sync/docker-compose.yml) mounts `./data` into the container so the cached Eero session survives container restarts and image rebuilds.
+
+## Synology Notes
+
+On Synology NAS, the usual flow is:
+
+1. Put this repo in a folder on the NAS.
+2. Create and edit `.env`.
+3. Run the one-time interactive login from a shell on the NAS with `docker compose run --rm eag-sync eag-sync sync`.
+4. Start the scheduled service with `docker compose up -d`.
+
+If you prefer the Synology Container Manager UI, the same settings apply:
+
+- mount a persistent folder to `/data`
+- set the environment variables from `.env`
+- use the default container command so cron stays running
+
+## CLI Usage
+
+Run a one-off sync locally:
+
+```sh
+python3 -m eero_adguard_sync sync
 ```
-Usage: eag-sync clear [OPTIONS]
 
-Options:
-  -y, --confirm  Skip interactive confirmation
-  --help         Show this message and exit.
+Useful options:
+
+```text
+--adguard-host
+--adguard-user
+--adguard-password
+--eero-user
+--eero-cookie
+--eero-network-id
+--eero-network-name
+-d, --delete
+-o, --overwrite
+-y, --confirm
+--debug
 ```
 
-## 🔮 Autocompletion
-To enable tab completion you will need to configure your preferred shell to use it. Currently `bash` and `zsh` are supported.
+You can also clear the cached Eero session:
 
-This configuration is totally optional, but may be useful if you use `eag-sync` often.
-
-### bash
-Add the following to `~/.bashrc`:
-```shell
-eval "$(_EAG_SYNC_COMPLETE=bash_source eag-sync)"
+```sh
+python3 -m eero_adguard_sync clear
 ```
 
-### zsh
-Add the following to `~/.zshrc`:
-```shell
-eval "$(_EAG_SYNC_COMPLETE=zsh_source eag-sync)"
-```
+## What Changed In This Fork
 
-## 🐋 Docker
-A Docker image that executes `eag-sync sync` on a `cron` schedule is available on Docker Hub with the tag [`amickael/eero-adguard-sync`](https://hub.docker.com/repository/docker/amickael/eero-adguard-sync). Some environment variables are required when running a container, see the table below for details.
-
-You can also build the image locally using the `Dockerfile` located in `/docker`.
-
-**Variable**|**Name**|**Notes**|**Required**|**Default**
------|-----|-----|-----|-----
-EAG\_EERO\_COOKIE|Eero session cookie value|Eero session cookie value from output of `eag-sync sync --debug`|Yes| 
-EAG\_ADGUARD\_HOST|AdGuard host IP address| |Yes| 
-EAG\_ADGUARD\_USER|AdGuard admin username| |Yes| 
-EAG\_ADGUARD\_PASS|AdGuard admin password| |Yes| 
-EAG\_SYNC\_FLAGS|`eag-sync` `sync` command flags|Sync flags without the dash, e.g. `EAG_SYNC_FLAGS="d"`<br><br>Note: `-y` is always appended|No|-y
-EAG\_CRON\_SCHEDULE|Sync schedule in cron syntax|See [crontab.guru](https://crontab.guru) for examples|No|`0 0 * * *`
-
-
-## ⚖️ License
-[MIT © 2022 Andrew Mickael](https://github.com/amickael/eero-adguard-sync/blob/master/LICENSE)
+- fixed Eero multi-network selection so the chosen network is actually used
+- added explicit non-interactive network selection
+- added environment-variable support for unattended runs
+- made the auth cache location configurable with `EAG_DATA_DIR`
+- switched Docker to build this fork instead of installing the stale published package
+- added a Compose setup designed for scheduled self-hosted deployment

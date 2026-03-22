@@ -1,0 +1,22 @@
+services:
+  eag-sync:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: eag-sync
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-America/Chicago}
+      EAG_DATA_DIR: /data
+      EAG_CRON_SCHEDULE: ${EAG_CRON_SCHEDULE:-0 * * * *}
+      EAG_ADGUARD_HOST: ${EAG_ADGUARD_HOST}
+      EAG_ADGUARD_USER: ${EAG_ADGUARD_USER}
+      EAG_ADGUARD_PASSWORD: ${EAG_ADGUARD_PASSWORD}
+      EAG_EERO_USER: ${EAG_EERO_USER:-}
+      EAG_EERO_COOKIE: ${EAG_EERO_COOKIE:-}
+      EAG_EERO_NETWORK_ID: ${EAG_EERO_NETWORK_ID:-}
+      EAG_EERO_NETWORK_NAME: ${EAG_EERO_NETWORK_NAME:-}
+      EAG_DELETE: ${EAG_DELETE:-false}
+      EAG_OVERWRITE: ${EAG_OVERWRITE:-false}
+    volumes:
+      - ./data:/data
