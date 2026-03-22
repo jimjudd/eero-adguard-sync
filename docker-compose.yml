@@ -1,8 +1,6 @@
 services:
   eag-sync:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
+    image: ${EAG_IMAGE:-ghcr.io/jimjudd/eero-adguard-sync:latest}
     container_name: eag-sync
     restart: unless-stopped
     environment:
